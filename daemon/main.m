@@ -7,6 +7,14 @@
 #import <sys/stat.h>
 #import <unistd.h>
 
+static void Log(NSString *fmt, ...) NS_FORMAT_FUNCTION(1, 2);
+static void Log(NSString *fmt, ...)
+{
+	if (!getenv("ISD_LOG")) return;
+	va_list a; va_start(a, fmt); NSString *s = [[NSString alloc] initWithFormat: fmt arguments: a]; va_end(a);
+	fprintf(stderr, "iconservicesd: %s\n", s.UTF8String);
+}
+
 static NSString *const kStorePath = @"/Library/Caches/com.apple.iconservices.store";
 
 /* a read extension for the store directory, as the Mac gives its clients; FreeBSD has no sandbox: an empty string then (our clients do not consume it) */
@@ -37,6 +45,7 @@ static NSString *StoreDirectory(NSString *domain)
 {
 	NSString *dir = StoreDirectory(domain);
 	if (dir) mkdir(dir.fileSystemRepresentation, 0711);
+	Log(@"cache path for domain %@: %@", domain, dir);
 	completion(dir, dir ? SandboxExtension(dir) : nil);
 }
 - (void)addData:(NSData *)data withUUID:(NSUUID *)uuid domain:(NSString *)domain completion:(void (^)(BOOL))completion
@@ -49,6 +58,7 @@ static NSString *StoreDirectory(NSString *domain)
 	NSString *tmp = [file stringByAppendingFormat: @".%d", getpid()];
 	BOOL ok = [data writeToFile: tmp options: 0 error: NULL] && chmod(tmp.fileSystemRepresentation, 0644) == 0 && rename(tmp.fileSystemRepresentation, file.fileSystemRepresentation) == 0;
 	if (!ok) unlink(tmp.fileSystemRepresentation);
+	Log(@"add %@ (%lu bytes): %d", uuid.UUIDString, (unsigned long)data.length, ok);
 	completion(ok);
 }
 - (void)removeItemWithUUID:(NSUUID *)uuid domain:(NSString *)domain completion:(void (^)(BOOL))completion
@@ -61,6 +71,7 @@ static NSString *StoreDirectory(NSString *domain)
 - (BOOL)listener:(NSXPCListener *)listener shouldAcceptNewConnection:(NSXPCConnection *)c
 {
 	Protocol *p = NSProtocolFromString(@"ISStoreServiceProtocol");
+	Log(@"connection (protocol %s)", p ? "found" : "MISSING");
 	if (!p) return NO;
 	c.exportedInterface = [NSXPCInterface interfaceWithProtocol: p];
 	c.exportedObject = self;

@@ -156,7 +156,8 @@ static id FallbackImage(id icon, CGFloat points, CGFloat scale)
 	[conf setValue: [NSURL fileURLWithPath: indexDir isDirectory: YES] forKey: @"url"];
 	[conf setValue: SandboxExtension(indexDir) forKey: @"sandboxExtension"];
 	Log(@"configuration: %@", indexDir);
-	reply(conf);
+	@try { reply(conf); } @catch (id e) { Log(@"configuration reply: exception %@", e); }
+	Log(@"configuration sent");
 }
 
 - (void)clearAllCachedItemsWithReply:(void (^)(BOOL, NSError *))reply
