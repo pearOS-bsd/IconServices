@@ -10,6 +10,7 @@ The protocol, the classes on the wire, the store files and the evidence are in `
 | `common/store_index.[ch]` | `store.index` (hash table, 152-byte nodes, 116-byte payload): add, find, verify. |
 | `test/index_check.c` | `make check`: 2500 nodes, chains, growth, lookups. |
 | `test/xpcping.m`, `test/isenc.m`, `test/isclient.m` | pearOS tests (`WITH_TESTS=1 sh build-bsd.sh OUT`): an NSXPC round trip (async, sync, NSURL reply), the secure encoding of `ISIconCacheConfiguration`, and a client that calls the agent with the framework's interface. |
+| `test/nometal.c` | macOS test helper: a process without a Metal device (`MTLCreateSystemDefaultDevice` nil, `MTLCopyAllDevices` empty), as on pearOS. |
 | `test/redirect.c` | macOS test helper: renames Mach services in one process (`IS_REDIRECT`), to point Apple's client at our services while SIP keeps Apple's jobs loaded. |
 
 ## Build
@@ -28,3 +29,7 @@ Built on FreeBSD (`build-bsd.sh`), started as root next to the image's Mac stack
 - Found on the way: a restarted daemon was refused at check-in by `d`'s launchd (its old port was kept; clients got `MACH_SEND_INVALID_DEST`): fixed in `d` (32c6f15).
 - Next blocker of the Dock: after IconServices it waits on `com.apple.lsd.mapdb` (the client reads the Launch Services database UUID and sequence for `ISGenerationRequest`; `lsd-stub` does not answer it): LaunchServices is the next service (docs/development/DOCK-REPLACEMENT.md).
 - To do here: run the agent as the user (index readable by the user's clients; needs check-in by non-root jobs in `d`'s launchd), the daemon as `_iconservices`, launchd jobs in the image, the fallback renderer exercised (no Metal on pearOS).
+
+## Rendering without Metal (Mac VM, 2026-11-26)
+IconRendering (26.7.2) has a software renderer (`isUsingSoftwareRenderer`, switch `FORCE_SOFTWARE_RENDERER`; CoreImage on the CPU). With `test/nometal.c` inserted, `-[ISGenerationRequest generateImageReturningRecordIdentifiers:]` still renders Calculator at 128 pt (1.0 s instead of 0.5 s), and the pixels are those of the GPU path within a mean difference of 1.76/255 (max 80, on the glass rim highlights). So on pearOS the agent should not need a Metal implementation for icons; the `.icns` fallback renderer stays for the case where the recipe returns nothing.
+Metal symbols the three frameworks import (IconRendering, RenderBox, IconServices): 26 C symbols / classes and 267 selectors; the Metal.framework of `dynldr` lacks 11 of the symbols (function stitching, visible function tables, binary archives, `MTLPixelFormatGetInfoForDevice`, `_MTLOverrideCurrentPreferredDevice` ...) and about 40 of the selectors, so it would not run RenderBox's GPU path as it is.
